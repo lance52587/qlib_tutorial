@@ -1,0 +1,76 @@
+simulator:
+    # Each step contains 30mins
+    time_per_step: 30
+    # Upper bound of volume, should be null or a float between 0 and 1, if it is a float, represent upper bound is calculated by the percentage of the market volume
+    vol_limit: null
+env:
+    # Concurrent environment workers.
+    concurrency: 1
+    # dummy or subproc or shmem. Corresponding to `parallelism in tianshou <https://tianshou.readthedocs.io/en/master/api/tianshou.env.html#vectorenv>`_.
+    parallel_mode: dummy
+action_interpreter:
+    class: CategoricalActionInterpreter
+    kwargs:
+        # Candidate actions, it can be a list with length L: [a_1, a_2,..., a_L] or an integer n, in which case the list of length n+1 is auto-generated, i.e., [0, 1/n, 2/n,..., n/n].
+        values: 14
+        # Total number of steps (an upper-bound estimation)
+        max_step: 8
+    module_path: qlib.rl.order_execution.interpreter
+state_interpreter:
+    class: FullHistoryStateInterpreter
+    kwargs:
+        # Number of dimensions in data.
+        data_dim: 6
+        # Equal to the total number of records. For example, in SAOE per minute, data_ticks is the length of the day in minutes.
+        data_ticks: 240
+        # The total number of steps (an upper-bound estimation). For example, 390min / 30min-per-step = 13 steps.
+        max_step: 8
+        # Provider of the processed data.
+        processed_data_provider:
+            class: PickleProcessedDataProvider
+            module_path: qlib.rl.data.pickle_styled
+            kwargs:
+                data_dir: ./data/pickle_dataframe/feature
+    module_path: qlib.rl.order_execution.interpreter
+reward:
+    class: PAPenaltyReward
+    kwargs:
+        # The penalty for a large volume in a short time.
+        penalty: 100.0
+    module_path: qlib.rl.order_execution.reward
+data:
+    source:
+        order_dir: ./data/training_order_split
+        data_dir: ./data/pickle_dataframe/backtest
+        # number of time indexes
+        total_time: 240
+        # start time index
+        default_start_time: 0
+        # end time index
+        default_end_time: 240
+        proc_data_dim: 6
+    num_workers: 0
+    queue_size: 20
+network:
+    class: Recurrent
+    module_path: qlib.rl.order_execution.network
+policy:
+    class: PPO
+    kwargs:
+        lr: 0.0001
+    module_path: qlib.rl.order_execution.policy
+runtime:
+    seed: 42
+    use_cuda: false
+trainer:
+    max_epoch: 2
+    # Number of episodes collected in each training iteration
+    repeat_per_collect: 5
+    earlystop_patience: 2
+    # Episodes per collect at training.
+    episode_per_collect: 20
+    batch_size: 16
+    # Perform validation every n iterations
+    val_every_n_epoch: 1
+    checkpoint_path: ./checkpoints
+    checkpoint_every_n_iters: 1
